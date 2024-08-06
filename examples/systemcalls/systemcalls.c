@@ -16,8 +16,12 @@ bool do_system(const char *cmd)
  *   and return a boolean true if the system() call completed with success
  *   or false() if it returned a failure
 */
-
-    return true;
+	int ret = system(cmd);
+	
+	if(!ret)
+		return true;
+	else
+    	return false;
 }
 
 /**
@@ -58,10 +62,40 @@ bool do_exec(int count, ...)
  *   as second argument to the execv() command.
  *
 */
+	va_end(args);
 
-    va_end(args);
+	int status;
+	fflush(stdout);
+	pid_t pid = fork();
 
-    return true;
+	if(pid == -1) {
+		perror("fork");
+		return false;
+	}
+	else if(!pid) {
+		
+		if(execv(command[0], command) == -1) {
+			perror("execv");
+		}
+		exit(EXIT_FAILURE);
+	}
+	
+/*	
+	for(i=0; i<count; i++) {
+		printf("COMMAND[%d] = %s\n",i,command[i]);
+	}
+*/
+
+	if(waitpid(pid, &status, 0) == -1) {
+		return false;
+	}
+	else if(WIFEXITED(status)) {
+		if(WEXITSTATUS(status) != 0) {
+			return false ;
+		}
+	}
+
+	return true;
 }
 
 /**
@@ -94,6 +128,49 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
 */
 
     va_end(args);
+    
+    int status;
+	fflush(stdout);
+	pid_t pid;
+	
+	int fd = open(outputfile, O_WRONLY|O_TRUNC|O_CREAT, 0644);
+	if (fd < 0) { 
+		perror("open"); 
+		//abort();
+		return false; 
+	}
+	switch (pid = fork()) {
+  		case -1: 
+  			perror("fork"); 
+  			//abort();
+  			return false;
+  		case 0:
+    		if (dup2(fd, 1) < 0) { 
+    			perror("dup2"); 
+    			//abort();
+    			return false;
+    		}
+    		close(fd);
+    		//execvp(cmd, args); 
+    		//perror("execvp");
+    		//abort();
+    		if(execv(command[0], command) == -1) {
+				perror("execv");
+			}
+			exit(EXIT_FAILURE);
+ 		 default:
+    		close(fd);
+    /* do whatever the parent wants to do. */
+	}
+	
+	if(waitpid(pid, &status, 0) == -1) {
+		return false;
+	}
+	else if(WIFEXITED(status)) {
+		if(WEXITSTATUS(status) != 0) {
+			return false ;
+		}
+	}
 
     return true;
 }
