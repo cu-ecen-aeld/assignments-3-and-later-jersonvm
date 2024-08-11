@@ -1,0 +1,5 @@
+DEBUG finder.sh: filesdir = /tmp/aeld-data
+DEBUG finder.sh: searchstr = AELD_IS_FUN
+MESSAGE finder.sh: Directory exists
+MESSAGE finder.sh: Directory = /tmp/aeld-data
+MESSAGE finder.sh:The number of files are 10 and the number of matching lines are 10
