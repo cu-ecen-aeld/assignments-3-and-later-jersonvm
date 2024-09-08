@@ -334,7 +334,8 @@ int main(int argc, char *argv[]) {
 
 	SLIST_HEAD(slisthead, slist_data_s) head;
     	SLIST_INIT(&head);
-
+	struct slist_data_s *threadp;
+	
 	while(!is_signal_caught) {
 		struct sockaddr_storage their_addr;
 		socklen_t addr_size;
@@ -361,7 +362,7 @@ int main(int argc, char *argv[]) {
 					
 			//ret = receive(new_fd);
 			
-			struct slist_data_s *threadp = malloc(sizeof(struct slist_data_s));
+			threadp = malloc(sizeof(struct slist_data_s));
 			threadp->thread_complete = false;
 			threadp->new_sockfd = new_fd;
 			SLIST_INSERT_HEAD(&head, threadp, entries);
@@ -396,9 +397,15 @@ int main(int argc, char *argv[]) {
 		remove(FILEPATH);
 	}
 	
+	
 	timer_delete(timer);		
-	SLIST_REMOVE_HEAD(&head, entries);
 	pthread_mutex_destroy(&the_mutex);
+	
+	while (!SLIST_EMPTY(&head)) {
+		threadp = SLIST_FIRST(&head);
+        	SLIST_REMOVE_HEAD(&head, entries);
+        	free(threadp);
+        }
 	
 	printf("Caught signal, exiting %d\n", pid);
 	syslog(LOG_DEBUG, "Caught signal, exiting\n");
@@ -411,6 +418,8 @@ int main(int argc, char *argv[]) {
 	//close(new_fd);
 	close(sockfd);
 	closelog();
+	
+	if(!SLIST_EMPTY(&head)) printf("SLIST NOT EMPTY\n");
 	
 	printf("Done %d\n", rc);
 	
