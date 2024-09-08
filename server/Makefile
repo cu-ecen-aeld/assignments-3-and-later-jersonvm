@@ -3,7 +3,7 @@ CROSS_COMPILE ?=
 TGT := aesdsocket
 SRC := aesdsocket.c
 OBJ := $(SRC:.c=.o)
-CFLAGS += -g -Wall -Werror 
+CFLAGS += -g -Wall -Werror
 
 ifdef CROSS_COMPILE
 CC := $(CROSS_COMPILE)gcc

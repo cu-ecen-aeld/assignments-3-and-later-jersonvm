@@ -138,8 +138,7 @@ void timer_thread() {
 	char MY_TIME[50];
 	time( &t );
 	
-	memset(MY_TIME, 0, sizeof(MY_TIME));
-	memset(&tmp, 0, sizeof tmp);
+	memset(MY_TIME, 0, 50);
 	
 	//localtime() uses the time pointed by t ,
 	// to fill a tm structure with the 
@@ -339,7 +338,6 @@ int main(int argc, char *argv[]) {
 		struct sockaddr_storage their_addr;
 		socklen_t addr_size;
 		char ipstr[INET_ADDRSTRLEN ];
-		memset(ipstr, 0, INET_ADDRSTRLEN);
 		
 		// now accept an incoming connection
 		addr_size = sizeof their_addr;
@@ -361,7 +359,8 @@ int main(int argc, char *argv[]) {
 					
 			//ret = receive(new_fd);
 			
-			struct slist_data_s *threadp = malloc(sizeof(struct slist_data_s));
+			struct slist_data_s *threadp;
+			threadp = calloc(1, sizeof(struct slist_data_s)); //malloc(sizeof(struct slist_data_s));
 			threadp->thread_complete = false;
 			threadp->new_sockfd = new_fd;
 			SLIST_INSERT_HEAD(&head, threadp, entries);
