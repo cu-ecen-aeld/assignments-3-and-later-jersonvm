@@ -1,6 +1,7 @@
 CC ?= $(CROSS_COMPILE)gcc
 CFLAGS ?= -g -Wall -Werror
-LDFLAGS ?= -pthread -lrt
+LDFLAGS ?= -lpthread -lrt
+INCLUDES ?=
 TGT := aesdsocket
 SRC := aesdsocket.c
 OBJ := $(SRC:.c=.o)
@@ -8,7 +9,7 @@ OBJ := $(SRC:.c=.o)
 all: $(TGT)
 
 $(TGT): $(SRC)
-	$(CC) $(CFLAGS) -o $(TGT) $(SRC) $(LDFLAGS)
+	$(CC) $(CFLAGS) -o $(TGT) $(SRC) $(INCLUDES) $(LDFLAGS)
 
 clean:
 	rm -f $(TGT) $(OBJ)
