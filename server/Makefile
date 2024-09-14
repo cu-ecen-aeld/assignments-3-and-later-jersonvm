@@ -1,18 +1,14 @@
-CC := gcc
-CROSS_COMPILE ?=
+CC ?= $(CROSS_COMPILE)gcc
+CFLAGS ?= -g -Wall -Werror
+LDFLAGS ?= -pthread -lrt
 TGT := aesdsocket
 SRC := aesdsocket.c
 OBJ := $(SRC:.c=.o)
-CFLAGS += -g -Wall -Werror
-
-ifdef CROSS_COMPILE
-CC := $(CROSS_COMPILE)gcc
-endif
 
 all: $(TGT)
 
 $(TGT): $(SRC)
-	$(CC) $(CFLAGS) -o $(TGT) $(SRC) -pthread -lrt
+	$(CC) $(CFLAGS) -o $(TGT) $(SRC) $(LDFLAGS)
 
 clean:
 	rm -f $(TGT) $(OBJ)
