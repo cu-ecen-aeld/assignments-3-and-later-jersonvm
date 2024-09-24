@@ -19,20 +19,49 @@
 /**
  * @param buffer the buffer to search for corresponding offset.  Any necessary locking must be performed by caller.
  * @param char_offset the position to search for in the buffer list, describing the zero referenced
- *      character index if all buffer strings were concatenated end to end
+ *	  character index if all buffer strings were concatenated end to end
  * @param entry_offset_byte_rtn is a pointer specifying a location to store the byte of the returned aesd_buffer_entry
- *      buffptr member corresponding to char_offset.  This value is only set when a matching char_offset is found
- *      in aesd_buffer.
+ *	  buffptr member corresponding to char_offset.  This value is only set when a matching char_offset is found
+ *	  in aesd_buffer.
  * @return the struct aesd_buffer_entry structure representing the position described by char_offset, or
  * NULL if this position is not available in the buffer (not enough data is written).
  */
 struct aesd_buffer_entry *aesd_circular_buffer_find_entry_offset_for_fpos(struct aesd_circular_buffer *buffer,
-            size_t char_offset, size_t *entry_offset_byte_rtn )
+			size_t char_offset, size_t *entry_offset_byte_rtn )
 {
-    /**
-    * TODO: implement per description
-    */
-    return NULL;
+		/**
+	* TODO: implement per description
+	*/
+	
+	if(buffer == NULL || entry_offset_byte_rtn == NULL) {
+		return NULL;
+	}
+	
+	uint8_t total_offs = 0;
+	uint8_t read_offs = buffer->out_offs;
+	struct aesd_buffer_entry *buffer_entry;
+	
+	do {
+		buffer_entry = &buffer->entry[read_offs];
+		
+		if(char_offset >= total_offs && char_offset < (total_offs + buffer_entry->size)) {
+			*entry_offset_byte_rtn = char_offset - total_offs;
+			return buffer_entry;
+		}
+
+		if(buffer_entry->buffptr != NULL) {
+			total_offs += buffer_entry->size;
+		}
+
+		read_offs++;
+		if(read_offs >= AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED) {
+			read_offs = 0;
+		}
+		
+	} while(read_offs != buffer->out_offs);
+
+	// if not found, return null
+	return NULL;
 }
 
 /**
@@ -44,9 +73,24 @@ struct aesd_buffer_entry *aesd_circular_buffer_find_entry_offset_for_fpos(struct
 */
 void aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, const struct aesd_buffer_entry *add_entry)
 {
-    /**
-    * TODO: implement per description
-    */
+	/**
+	* TODO: implement per description
+	*/
+	if(buffer == NULL || add_entry == NULL) {
+		return;
+	}
+
+	buffer->entry[buffer->in_offs] = *add_entry;
+	buffer->in_offs = (buffer->in_offs + 1) % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;
+
+	if(buffer->full) {
+		// the second implementation mentioned in lecture video
+		buffer->out_offs = (buffer->out_offs + 1) % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;
+	}
+	
+	if(buffer->in_offs == buffer->out_offs) {
+		buffer->full = true;
+	}
 }
 
 /**
@@ -54,5 +98,5 @@ void aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, const s
 */
 void aesd_circular_buffer_init(struct aesd_circular_buffer *buffer)
 {
-    memset(buffer,0,sizeof(struct aesd_circular_buffer));
+	memset(buffer,0,sizeof(struct aesd_circular_buffer));
 }
