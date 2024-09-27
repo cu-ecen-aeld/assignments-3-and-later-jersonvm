@@ -21,8 +21,13 @@
 #define PORT "9000" // the port users will be connecting to
 #define BACKLOG 10 // how many pending connections queue will hold
 #define BUFSIZE 128
-#define FILEPATH "/var/tmp/aesdsocketdata"
 
+#define USE_AESD_CHAR_DEVICE 1
+#ifdef USE_AESD_CHAR_DEVICE
+	#define FILEPATH "/dev/aesdchar"
+#else
+	#define FILEPATH "/var/tmp/aesdsocketdata"
+#endif
 
 bool is_signal_caught = false;
 static pthread_mutex_t the_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -107,7 +112,18 @@ void *receive_thread( void *arg ) {
 		//rc = -1;
 	}
 	
-	lseek(file, 0, SEEK_SET);
+	#ifndef USE_AESD_CHAR_DEVICE
+		lseek(file, 0, SEEK_SET);
+	#else
+		close(file);
+		if((file = open(FILEPATH, O_CREAT | O_APPEND | O_RDWR, 0644)) == -1) {
+			err = errno;
+			perror("open");
+			syslog(LOG_ERR, "open error: %s\n", strerror(err));
+			//rc = -1;
+		}
+	#endif
+
 	while ((ret = read(file, buf, BUFSIZE)) > 0) {
         	//printf("Sending %d\n", ret);
         	//printf("Sending %s to %s\n", buf, FILEPATH);
@@ -130,7 +146,7 @@ void *receive_thread( void *arg ) {
 	return arg;
 }
 
-
+#ifndef USE_AESD_CHAR_DEVICE
 void timer_thread() {
 	//https://www.geeksforgeeks.org/strftime-function-in-c/
 	time_t t ;
@@ -170,6 +186,7 @@ void timer_thread() {
 	close(file);
 	
 }
+#endif
 
 // get sockaddr, IPv4 or IPv6:
 void *get_in_addr(struct sockaddr *sa) {
@@ -281,6 +298,7 @@ int main(int argc, char *argv[]) {
 				
 	}
 	
+	#ifndef USE_AESD_CHAR_DEVICE
 	//LSP pages 389 to 394
 	timer_t timer;
 	struct sigevent evp;
@@ -304,6 +322,7 @@ int main(int argc, char *argv[]) {
 		perror("timer_settime");
 		timer_delete(timer);
 	}
+	#endif
 	
 	
 	if ((ret = listen(sockfd, BACKLOG)) == -1) {
@@ -393,12 +412,13 @@ int main(int argc, char *argv[]) {
 	
 	if(is_signal_caught) rc = 0;
 
-	if(open(FILEPATH, O_CREAT | O_APPEND | O_RDWR, 0644) > 0) {
-		remove(FILEPATH);
-	}
-	
-	
-	timer_delete(timer);		
+	#ifndef USE_AESD_CHAR_DEVICE
+		if(open(FILEPATH, O_CREAT | O_APPEND | O_RDWR, 0644) > 0) {
+			remove(FILEPATH);
+		}
+		timer_delete(timer);		
+	#endif
+
 	pthread_mutex_destroy(&the_mutex);
 	
 	while (!SLIST_EMPTY(&head)) {
