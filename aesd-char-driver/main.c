@@ -123,7 +123,7 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 			retval = -EFAULT;
 			goto out;
 		}
-	dev->entry.size += count;
+		dev->entry.size += count;
 	} else {
 		dev->entry.buffptr = kmalloc( count, GFP_KERNEL );
 		if (!dev->entry.buffptr) 
