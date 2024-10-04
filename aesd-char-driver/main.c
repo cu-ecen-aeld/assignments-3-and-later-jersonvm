@@ -20,6 +20,7 @@
 #include <linux/slab.h>
 #include "aesdchar.h"
 #include "aesd-circular-buffer.h"
+#include "aesd_ioctl.h"
 int aesd_major =   0; // use dynamic major
 int aesd_minor =   0;
 
@@ -147,12 +148,103 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 	
 	return retval;
 }
+
+loff_t aesd_llseek( struct file *filp, loff_t off, int whence )
+{
+	struct aesd_dev *dev = filp->private_data;
+	loff_t retval = 0;
+	size_t i, size = 0;
+	
+	if (mutex_lock_interruptible( &dev->lock ))
+		return -ERESTARTSYS;
+
+	/* choose implementation option 2 from the lecture -> perform llseek using fixed_size_llseek() 
+	   use the total size of the circular buffer as suggested*/
+	for (i = 0; i < AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED; i++) {
+		size += dev->buffer.entry[i].size;
+	}
+	retval = fixed_size_llseek( filp, off, whence, size );
+	PDEBUG("llseek: offset = %lld, whence = %d, retval = %lld", off, whence, retval);
+	
+	mutex_unlock( &dev->lock );
+
+	return retval;
+}
+
+
+static long aesd_adjust_file_offset(struct file *filp, unsigned int write_cmd, unsigned int write_cmd_offset)
+{
+	struct aesd_dev *dev = filp->private_data;
+	struct aesd_buffer_entry *entry;
+	size_t size = 0;
+	long retval = -EINVAL;
+	unsigned int i;
+	
+	if (mutex_lock_interruptible( &dev->lock ))
+		return -ERESTARTSYS;
+		
+	/*Check for valid write_cmd and write_cmd_offset values*/
+	if(write_cmd >= AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED)
+        	goto out;
+
+	entry = &dev->buffer.entry[write_cmd];
+	
+	if (write_cmd_offset >= entry->size)
+		goto out;
+    	
+	/*Calculate the start offset to write_cmd*/
+	for (i = 0; i < write_cmd; i++) 
+		size += dev->buffer.entry[i].size;
+	
+	/*Add write_cmd_offset*/
+	/*Save as filp->f_pos*/
+	filp->f_pos = size + write_cmd_offset;
+	retval = 0;
+	
+  out:
+	mutex_unlock( &dev->lock );
+	
+	return retval;
+}
+
+long aesd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+{
+
+	int retval = 0;
+	struct aesd_seekto seekto;
+    
+	/*
+	 * extract the type and number bitfields, and don't decode
+	 * wrong cmds: return ENOTTY (inappropriate ioctl) before access_ok()
+	 */
+	if (_IOC_TYPE(cmd) != AESD_IOC_MAGIC) return -ENOTTY;
+	if (_IOC_NR(cmd) > AESDCHAR_IOC_MAXNR) return -ENOTTY;
+
+	switch(cmd) {
+		/*Implementation from lecture slide*/
+		case AESDCHAR_IOCSEEKTO:
+			if (copy_from_user( &seekto, (const void __user *) arg, sizeof(seekto)) != 0) {
+				retval = EFAULT;
+			} else {
+				retval = aesd_adjust_file_offset( filp, seekto.write_cmd, seekto.write_cmd_offset );
+			}
+			break;
+		
+		default:  /* redundant, as cmd was checked against MAXNR */
+			return -ENOTTY;
+	}
+	return retval;
+}
+
+
 struct file_operations aesd_fops = {
 	.owner = THIS_MODULE,
 	.read = aesd_read,
 	.write = aesd_write,
 	.open = aesd_open,
 	.release = aesd_release,
+	.llseek = aesd_llseek,
+	.unlocked_ioctl = aesd_ioctl,
 };
 
 static int aesd_setup_cdev(struct aesd_dev *dev)

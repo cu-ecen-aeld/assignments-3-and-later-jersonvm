@@ -17,10 +17,12 @@
 #include <pthread.h>
 #include "queue.h"
 #include <time.h>
+#include "../aesd-char-driver/aesd_ioctl.h"
 
 #define PORT "9000" // the port users will be connecting to
 #define BACKLOG 10 // how many pending connections queue will hold
 #define BUFSIZE 128
+#define IOCTL_CMD "AESDCHAR_IOCSEEKTO"
 
 #define USE_AESD_CHAR_DEVICE 1
 #ifdef USE_AESD_CHAR_DEVICE
@@ -55,6 +57,8 @@ void *receive_thread( void *arg ) {
 	int  err, ret, file;
 	//int rc = 0;
 	
+	
+	
 	// ready to communicate on socket descriptor new_fd!
 	memset(buf, 0, BUFSIZE);
 	
@@ -71,19 +75,35 @@ void *receive_thread( void *arg ) {
 		//printf("Received %d\n", ret);
 		buf[ret] = '\0';
 		char *newline = strchr(buf, '\n');
-		
-		if (newline) {
+		struct aesd_seekto seekto;
+
+		if(newline) {
 			pthread_mutex_lock(&the_mutex);
-			if(write(file, buf, newline - buf + 1) < 0) {
-				err = errno;
-				perror("write");
-				syslog(LOG_ERR, "write error: %s\n", strerror(err));
-				//rc = -1;
-				//break;
-			} else {
-				//printf("1writing %s to %s\n", buf, FILEPATH);
-				syslog(LOG_DEBUG, "writing %s to %s", buf, FILEPATH);
-				//break;
+			
+			if(strstr(buf,IOCTL_CMD)) {
+			
+				sscanf(buf, IOCTL_CMD":%d,%d", &seekto.write_cmd, &seekto.write_cmd_offset);
+				
+				if (ioctl( file, AESDCHAR_IOCSEEKTO, &seekto ) < 0) {
+					err = errno;
+					perror("ioctl");
+					syslog( LOG_ERR, "ioctl error: %s", strerror(err) );
+				}
+				//printf("ioctl command found: %u, %u\n",seekto.write_cmd,seekto.write_cmd_offset);
+			}
+			else {
+			
+				if(write(file, buf, newline - buf + 1) < 0) {
+					err = errno;
+					perror("write");
+					syslog(LOG_ERR, "write error: %s\n", strerror(err));
+					//rc = -1;
+					//break;
+				} else {
+					//printf("1writing %s to %s\n", buf, FILEPATH);
+					syslog(LOG_DEBUG, "writing %s to %s", buf, FILEPATH);
+					//break;
+				}
 			}
 			pthread_mutex_unlock(&the_mutex);
 			break;
@@ -112,8 +132,9 @@ void *receive_thread( void *arg ) {
 		//rc = -1;
 	}
 	
-	#ifndef USE_AESD_CHAR_DEVICE
-		lseek(file, 0, SEEK_SET);
+	
+	/*#ifndef USE_AESD_CHAR_DEVICE
+		lseek(file, 0, SEEK_SET);		
 	#else
 		close(file);
 		if((file = open(FILEPATH, O_CREAT | O_APPEND | O_RDWR, 0644)) == -1) {
@@ -122,7 +143,7 @@ void *receive_thread( void *arg ) {
 			syslog(LOG_ERR, "open error: %s\n", strerror(err));
 			//rc = -1;
 		}
-	#endif
+	#endif*/
 
 	while ((ret = read(file, buf, BUFSIZE)) > 0) {
         	//printf("Sending %d\n", ret);
